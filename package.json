@@ -1,0 +1,33 @@
+{
+    "name": "river",
+    "version": "1.0.0",
+    "description": "River — A Node.js CLI tool that processes large files through a streaming pipeline, demonstrating backpressure, transform streams, and memory-efficient file processing without loading entire files into memory.",
+    "main": "index.js",
+    "bin": {
+        "river": "./index.ts"
+    },
+    "scripts": {
+        "dev": "node --watch index.ts",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/TheMoeaegon/River.git"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "type": "module",
+    "bugs": {
+        "url": "https://github.com/TheMoeaegon/River/issues"
+    },
+    "homepage": "https://github.com/TheMoeaegon/River#readme",
+    "devDependencies": {
+        "@types/node": "^25.5.0",
+        "@types/yargs": "^17.0.35",
+        "typescript": "^5.9.3"
+    },
+    "dependencies": {
+        "yargs": "^18.0.0"
+    }
+}
