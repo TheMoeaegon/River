@@ -1,3 +1,5 @@
+import type { Argv } from "./types.ts";
+
 export const progressBar = (current: number, total: number, width: number = 60): string => {
     const percent = current / total;
     const filled = Math.floor(percent * width);

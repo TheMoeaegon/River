@@ -1,103 +1,36 @@
 #!/usr/bin/env node
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
+import { processFile } from "./src/fileProcessing.ts";
 
-import fs from "node:fs";
-import { createReadStream } from "node:fs";
-import { Transform, Writable } from "node:stream";
-import { pipeline } from "node:stream/promises";
-import { printStatus, progressBar } from "./src/utility.ts";
-
-let lineCount = 0;
-const totalSize = fs.statSync("./moee.log").size;
-let startTime: number;
-let totalBytes = 0;
-let speed: number;
-const matchLines = [];
-
-const readableStream = createReadStream("./moee.log");
-
-const lineParser = (): Transform => {
-    let leftOver = "";
-    return new Transform({
-        transform(chunk, encoding, cb) {
-            let data = leftOver + chunk.toString();
-            const lines = data.split("\n");
-            leftOver = lines.pop();
-            for (let line of lines) {
-                this.push(line);
-            }
-            cb();
+const argv = yargs(hideBin(process.argv))
+    .usage("Usage: search <terms...> -f <file> [options]")
+    .example("search ERROR -f app.log", "find all ERROR lines in app.log")
+    .example("search WARN ERROR -f app.log", "find WARN and ERROR lines")
+    .example("search ERROR -f app.log -o errors.log", "write results to file")
+    .option("output", {
+        alias: "o",
+        type: "string",
+        describe: "Path to output file",
+    })
+    .command(
+        "$0 <terms...>",
+        "Search for terms in file",
+        (yargs) =>
+            yargs
+                .positional("terms", {
+                    describe: "One or more terms to search for",
+                    type: "string",
+                })
+                .option("file", {
+                    alias: "f",
+                    type: "string",
+                    describe: "The filename to search within",
+                    demandOption: "You must provide a file with -f",
+                }),
+        (argv) => {
+            processFile({ file: argv.file, output: argv.output, terms: [...argv.terms] });
         },
-        flush(cb) {
-            if (leftOver) {
-                this.push(leftOver);
-            }
-            cb();
-        },
-        readableObjectMode: true,
-    });
-};
-
-const tracker = new Transform({
-    transform(chunk, encoding, cb) {
-        totalBytes += chunk.length;
-        const elapsed = (Date.now() - startTime) / 1000;
-        if (elapsed == 0) {
-            return;
-        }
-        speed = totalBytes / elapsed;
-        const remaining = totalSize - totalBytes;
-        const eta = remaining / speed;
-        const bar = progressBar(totalBytes, totalSize);
-
-        process.stderr.write("\r\x1b[2K");
-        process.stderr.write(`${bar} | ${(speed / (1024 * 1024)).toFixed(1)} MB/s | ETA: ${eta.toFixed(1)}s`);
-        cb(null, chunk);
-    },
-});
-
-const filterStream = (searchTerm: string) => {
-    return new Transform({
-        objectMode: true,
-        transform(line, encoding, cb) {
-            if ((line as string).includes(searchTerm)) {
-                this.push(line.split(searchTerm).join(`\x1b[1m\x1b[31m${searchTerm}\x1b[0m`));
-            }
-            cb();
-        },
-    });
-};
-
-const collector = new Writable({
-    objectMode: true,
-    write(line, encoding, cb) {
-        lineCount++;
-        matchLines.push(line);
-        cb();
-    },
-});
-
-const processFile = async () => {
-    try {
-        startTime = Date.now();
-        await pipeline(readableStream, tracker, lineParser(), filterStream("WARN"), collector);
-        printStatus(matchLines, startTime, speed, lineCount);
-    } catch (err: any) {
-        //file not found
-        if (err.code === "ENOENT") {
-            process.stderr.write(`error: file not found — ${err.path}\n`);
-            process.exit(1);
-        }
-
-        // permission denied
-        if (err.code === "EACCES") {
-            process.stderr.write(`error: permission denied — ${err.path}\n`);
-            process.exit(1);
-        }
-
-        // anything else
-        process.stderr.write(`error: ${err.message}\n`);
-        process.exit(1);
-    }
-};
-
-processFile();
+    )
+    .epilog("River — a fast file search tool")
+    .parse();
