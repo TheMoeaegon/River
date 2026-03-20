@@ -4,15 +4,16 @@ import fs from "node:fs";
 import { createReadStream } from "node:fs";
 import { Transform, Writable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { progressBar } from "./src/utility.ts";
+import { printStatus, progressBar } from "./src/utility.ts";
 
 let lineCount = 0;
-const totalSize = fs.statSync("./app.log").size;
-const startTime = Date.now();
+const totalSize = fs.statSync("./moee.log").size;
+let startTime: number;
 let totalBytes = 0;
+let speed: number;
 const matchLines = [];
 
-const readableStream = createReadStream("./app.log");
+const readableStream = createReadStream("./moee.log");
 
 const lineParser = (): Transform => {
     let leftOver = "";
@@ -43,15 +44,13 @@ const tracker = new Transform({
         if (elapsed == 0) {
             return;
         }
-        const speed = totalBytes / elapsed;
+        speed = totalBytes / elapsed;
         const remaining = totalSize - totalBytes;
         const eta = remaining / speed;
         const bar = progressBar(totalBytes, totalSize);
 
         process.stderr.write("\r\x1b[2K");
-        process.stderr.write(
-            `${bar} | ${(speed / (1024 * 1024)).toFixed(1)} MB/s | ETA: ${eta.toFixed(1)}s`,
-        );
+        process.stderr.write(`${bar} | ${(speed / (1024 * 1024)).toFixed(1)} MB/s | ETA: ${eta.toFixed(1)}s`);
         cb(null, chunk);
     },
 });
@@ -61,14 +60,14 @@ const filterStream = (searchTerm: string) => {
         objectMode: true,
         transform(line, encoding, cb) {
             if ((line as string).includes(searchTerm)) {
-                this.push(line);
+                this.push(line.split(searchTerm).join(`\x1b[1m\x1b[31m${searchTerm}\x1b[0m`));
             }
             cb();
         },
     });
 };
 
-const drain = new Writable({
+const collector = new Writable({
     objectMode: true,
     write(line, encoding, cb) {
         lineCount++;
@@ -79,19 +78,25 @@ const drain = new Writable({
 
 const processFile = async () => {
     try {
-        console.log("reading the file");
+        startTime = Date.now();
+        await pipeline(readableStream, tracker, lineParser(), filterStream("WARN"), collector);
+        printStatus(matchLines, startTime, speed, lineCount);
+    } catch (err: any) {
+        //file not found
+        if (err.code === "ENOENT") {
+            process.stderr.write(`error: file not found — ${err.path}\n`);
+            process.exit(1);
+        }
 
-        await pipeline(
-            readableStream,
-            tracker,
-            lineParser(),
-            filterStream("WARN"),
-            drain,
-        );
-        process.stdout.write("\n");
-        process.stdout.write(matchLines.join("\n") + "\n");
-    } catch (error) {
-        console.error(error);
+        // permission denied
+        if (err.code === "EACCES") {
+            process.stderr.write(`error: permission denied — ${err.path}\n`);
+            process.exit(1);
+        }
+
+        // anything else
+        process.stderr.write(`error: ${err.message}\n`);
+        process.exit(1);
     }
 };
 
