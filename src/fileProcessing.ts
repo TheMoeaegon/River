@@ -8,7 +8,7 @@ import { printStatus, progressBar } from "./utils.ts";
 import type { Argv } from "./types.ts";
 
 let lineCount = 0;
-let totalSize;
+let totalSize: number;
 let startTime: number;
 let totalBytes = 0;
 let speed: number;
@@ -53,7 +53,7 @@ const tracker = new Transform({
         const bar = progressBar(totalBytes, totalSize);
 
         process.stderr.write("\r\x1b[2K");
-        process.stderr.write(`${bar} | ${(speed / (1024 * 1024)).toFixed(1)} MB/s | ETA: ${eta.toFixed(1)}s`);
+        process.stderr.write(`${bar} | ${(speed / (1024 * 1024)).toFixed(1)} MB/s | ETA: ${eta.toFixed(1)}s\n`);
         cb(null, chunk);
     },
 });
@@ -63,8 +63,9 @@ const filterStream = (searchTerms: string[]) => {
         objectMode: true,
         transform(line, encoding, cb) {
             for (let word of searchTerms) {
-                if ((line as string).includes(word)) {
-                    this.push(line.split(word).join(`\x1b[1m\x1b[31m${word}\x1b[0m`));
+                if ((line as string).toLowerCase().includes(word.toLowerCase())) {
+                    lineCount++;
+                    this.push(line + "\n");
                 }
             }
             cb();
@@ -72,21 +73,36 @@ const filterStream = (searchTerms: string[]) => {
     });
 };
 
-const collector = new Writable({
-    objectMode: true,
-    write(line, encoding, cb) {
-        lineCount++;
-        matchLines.push(line.trim());
-        cb();
-    },
-});
+const terminalWriter = (searchTerms: string[]) => {
+    return new Writable({
+        objectMode: true,
+        write(line, encoding, cb) {
+            let formatted = line;
+
+            for (const word of searchTerms) {
+                const regex = new RegExp(word, "gi");
+                formatted = formatted.replace(regex, (match: string) => {
+                    return `\x1b[1m\x1b[31m${match}\x1b[0m`;
+                });
+            }
+
+            matchLines.push(formatted.trim());
+            cb();
+        },
+    });
+};
+
+const writeToFile = (filePath: string) => {
+    return fs.createWriteStream(filePath, { flags: "a" });
+};
 
 export const processFile = async ({ file, output, terms }: Argv) => {
     try {
         startTime = Date.now();
         totalSize = fs.statSync(file).size;
-        await pipeline(readableStream(file), tracker, lineParser(), filterStream(terms), collector);
-        printStatus(matchLines, startTime, speed, lineCount);
+        const writeableStream = output ? writeToFile(output) : terminalWriter(terms);
+        await pipeline(readableStream(file), tracker, lineParser(), filterStream(terms), writeableStream);
+        printStatus(matchLines, startTime, speed, lineCount, output);
     } catch (err: any) {
         //file not found
         if (err.code === "ENOENT") {
