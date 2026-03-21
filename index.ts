@@ -4,10 +4,10 @@ import { hideBin } from "yargs/helpers";
 import { processFile } from "./src/fileProcessing.ts";
 
 const argv = yargs(hideBin(process.argv))
-    .usage("Usage: search <terms...> -f <file> [options]")
-    .example("search ERROR -f app.log", "find all ERROR lines in app.log")
-    .example("search WARN ERROR -f app.log", "find WARN and ERROR lines")
-    .example("search ERROR -f app.log -o errors.log", "write results to file")
+    .usage("Usage: river <terms...> -f <file> [options]")
+    .example("river ERROR -f app.log", "find all ERROR lines in app.log")
+    .example("river WARN ERROR -f app.log", "find WARN and ERROR lines")
+    .example("river ERROR -f app.log -o errors.log", "write results to file")
     .option("output", {
         alias: "o",
         type: "string",

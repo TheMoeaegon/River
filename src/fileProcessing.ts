@@ -53,7 +53,8 @@ const tracker = new Transform({
         const bar = progressBar(totalBytes, totalSize);
 
         process.stderr.write("\r\x1b[2K");
-        process.stderr.write(`${bar} | ${(speed / (1024 * 1024)).toFixed(1)} MB/s | ETA: ${eta.toFixed(1)}s\n`);
+        process.stderr.write(`${bar} | ${(speed / (1024 * 1024)).toFixed(1)} MB/s | ETA: ${eta.toFixed(1)}s`);
+
         cb(null, chunk);
     },
 });

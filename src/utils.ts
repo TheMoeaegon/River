@@ -17,6 +17,7 @@ export const printStatus = (
     output: string,
 ) => {
     if (matchLines.length > 1) {
+        process.stdout.write("\n");
         process.stdout.write(matchLines.join("\n") + "\n");
     }
     process.stdout.write(

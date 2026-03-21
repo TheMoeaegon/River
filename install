@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+
+# ─────────────────────────────────────────────
+#  River — install script
+# ─────────────────────────────────────────────
+
+set -e  # exit immediately if any command fails
+
+# ── colors ────────────────────────────────────
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+RESET='\033[0m'
+
+# ── helpers ───────────────────────────────────
+info()    { echo -e "${CYAN}${BOLD}[river]${RESET} $1"; }
+success() { echo -e "${GREEN}${BOLD}[✓]${RESET} $1"; }
+warn()    { echo -e "${YELLOW}${BOLD}[!]${RESET} $1"; }
+error()   { echo -e "${RED}${BOLD}[✗]${RESET} $1"; exit 1; }
+
+# ── header ────────────────────────────────────
+echo ""
+echo -e "${CYAN}${BOLD}"
+echo "  ██████╗ ██╗██╗   ██╗███████╗██████╗ "
+echo "  ██╔══██╗██║██║   ██║██╔════╝██╔══██╗"
+echo "  ██████╔╝██║██║   ██║█████╗  ██████╔╝"
+echo "  ██╔══██╗██║╚██╗ ██╔╝██╔══╝  ██╔══██╗"
+echo "  ██║  ██║██║ ╚████╔╝ ███████╗██║  ██║"
+echo "  ╚═╝  ╚═╝╚═╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝"
+echo -e "${RESET}"
+echo -e "  ${BOLD}A file processing pipeline CLI tool${RESET}"
+echo ""
+
+# ── check node ────────────────────────────────
+info "checking requirements..."
+
+if ! command -v node &> /dev/null; then
+    error "node.js is not installed. install it from https://nodejs.org (v18 or higher)"
+fi
+
+NODE_VERSION=$(node -v | sed 's/v//' | cut -d'.' -f1)
+if [ "$NODE_VERSION" -lt 18 ]; then
+    error "node.js v18 or higher is required. current version: $(node -v)"
+fi
+
+success "node.js $(node -v) found"
+
+# ── check npm ─────────────────────────────────
+if ! command -v npm &> /dev/null; then
+    error "npm is not installed. install it from https://nodejs.org"
+fi
+
+success "npm $(npm -v) found"
+
+# ── install dependencies ───────────────────────
+info "installing dependencies..."
+
+if ! npm install --silent; then
+    error "failed to install dependencies. check your network connection and try again."
+fi
+
+success "dependencies installed"
+
+# ── build ─────────────────────────────────────
+info "building river..."
+
+if ! npm run build --silent; then
+    error "build failed. check the error above and try again."
+fi
+
+#success "build complete"
+
+# ── npm link ──────────────────────────────────
+info "linking river to your system..."
+
+if ! npm link --silent 2>/dev/null; then
+    # try with sudo if regular link fails (permission issue)
+    warn "trying with sudo (you may be prompted for your password)..."
+    if ! sudo npm link --silent; then
+        error "failed to link. try running manually: sudo npm link"
+    fi
+fi
+
+success "river linked successfully"
+
+# ── verify installation ───────────────────────
+info "verifying installation..."
+
+if ! command -v river &> /dev/null; then
+    warn "command 'river' not found in PATH."
+    warn "your node bin may not be in PATH. add this to your shell config:"
+    echo ""
+    echo -e "  ${BOLD}export PATH=\"\$(npm bin -g):\$PATH\"${RESET}"
+    echo ""
+    warn "then restart your terminal and run: river --help"
+else
+    success "river installed successfully"
+    echo ""
+    echo -e "  ${BOLD}get started:${RESET}"
+    echo -e "  ${CYAN}river --help${RESET}"
+    echo ""
+fi
